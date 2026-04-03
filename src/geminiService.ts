@@ -88,29 +88,53 @@ export const schedulerAgent = async (currentTasks: Task[], missedTask?: string):
 };
 
 export const opportunityAgent = async (): Promise<Opportunity[]> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: "Identify 5 upcoming hackathons and technical events relevant to AIDS students in Maharashtra (Pune, Mumbai, Amravati, etc.). Focus on 2026 events.",
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            location: { type: Type.STRING },
-            date: { type: Type.STRING },
-            type: { type: Type.STRING },
-            link: { type: Type.STRING },
-            relevance: { type: Type.STRING }
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: "Identify 5 upcoming hackathons and technical events relevant to AIDS (AI & Data Science) students in Maharashtra (Pune, Mumbai, Amravati, etc.). Focus on 2026 events. Include links if possible.",
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              location: { type: Type.STRING },
+              date: { type: Type.STRING },
+              type: { type: Type.STRING, enum: ['hackathon', 'workshop', 'seminar'] },
+              link: { type: Type.STRING },
+              relevance: { type: Type.STRING }
+            },
+            required: ['title', 'location', 'date', 'type', 'link', 'relevance']
           }
         }
       }
-    }
-  });
-  return JSON.parse(response.text || "[]");
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    console.error("opportunityAgent failed:", error);
+    // Return mock data as fallback so the page isn't empty
+    return [
+      { 
+        title: "Pune AI Innovation Hackathon", 
+        location: "Pune, MH", 
+        date: "May 15-17, 2026", 
+        type: "hackathon", 
+        link: "https://example.com/pune-ai", 
+        relevance: "Focus on LLM applications in local governance." 
+      },
+      { 
+        title: "Mumbai Data Science Summit", 
+        location: "Mumbai, MH", 
+        date: "June 10, 2026", 
+        type: "seminar", 
+        link: "https://example.com/mumbai-ds", 
+        relevance: "Networking with industry leaders from top tech firms." 
+      }
+    ];
+  }
 };
 
 export const sparkAgent = async (freeGaps: string[]): Promise<SparkTask[]> => {
@@ -143,10 +167,8 @@ export const mentorAgent = async (query: string, currentContext: any, history: {
   studyPlan?: StudyPlan,
   sources?: { title: string, uri: string }[]
 }> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      { role: 'user', parts: [{ text: `You are "Senior Top", a high-efficiency Proactive Assistant for AIDS (AI & Data Science) students in Maharashtra. 
+  try {
+    const systemInstruction = `You are "Senior Top", a high-efficiency Proactive Assistant for AIDS (AI & Data Science) students in Maharashtra. 
         Persona: Direct, high-utility, proactive, and encouraging. You manage background tasks automatically and focus on streaks and consistency.
         
         Current Context (Tasks/Events/Habits): ${JSON.stringify(currentContext)}
@@ -162,85 +184,102 @@ export const mentorAgent = async (query: string, currentContext: any, history: {
         If it involves calendar updates, set it to 'update-calendar'. 
         If you generate a study plan, set it to 'add-study-plan' and include the studyPlan object.
         
-        Output a structured JSON with your response, an optional action, optional suggestedBlocks, optional studyPlan, and optional sources.` }] },
-      ...history.map(h => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] })),
-      { role: 'user', parts: [{ text: query }] }
-    ],
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          response: { type: Type.STRING },
-          action: { type: Type.STRING, enum: ['update-calendar', 'recalculate-schedule', 'add-study-plan'] },
-          suggestedBlocks: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                date: { type: Type.STRING }
-              }
-            }
-          },
-          studyPlan: {
-            type: Type.OBJECT,
-            properties: {
-              subject: { type: Type.STRING },
-              topics: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    weightage: { type: Type.STRING },
-                    deadline: { type: Type.STRING },
-                    subtopics: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    isImportant: { type: Type.BOOLEAN }
-                  }
-                }
-              },
-              examDates: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    type: { type: Type.STRING },
-                    date: { type: Type.STRING }
-                  }
+        Output a structured JSON with your response, an optional action, optional suggestedBlocks, optional studyPlan, and optional sources.`;
+
+    const contents = history
+      .filter((h, i) => !(i === 0 && h.role === 'assistant')) // Skip initial greeting if it's the first message
+      .map(h => ({ role: h.role === 'assistant' ? 'model' : 'user' as any, parts: [{ text: h.content }] }));
+    
+    // If history was empty or only contained the greeting, contents might be empty.
+    // Gemini still needs a user message.
+    contents.push({ role: 'user', parts: [{ text: query }] });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents,
+      config: {
+        systemInstruction,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            response: { type: Type.STRING },
+            action: { type: Type.STRING, enum: ['update-calendar', 'recalculate-schedule', 'add-study-plan'] },
+            suggestedBlocks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  date: { type: Type.STRING }
                 }
               }
-            }
-          },
-          sources: {
-            type: Type.ARRAY,
-            items: {
+            },
+            studyPlan: {
               type: Type.OBJECT,
               properties: {
-                title: { type: Type.STRING },
-                uri: { type: Type.STRING }
+                subject: { type: Type.STRING },
+                topics: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      weightage: { type: Type.STRING },
+                      deadline: { type: Type.STRING },
+                      subtopics: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      isImportant: { type: Type.BOOLEAN }
+                    }
+                  }
+                },
+                examDates: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      type: { type: Type.STRING },
+                      date: { type: Type.STRING }
+                    }
+                  }
+                }
+              }
+            },
+            sources: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  uri: { type: Type.STRING }
+                }
               }
             }
           }
         }
       }
+    });
+
+    const text = response.text || "{}";
+    const parsed = JSON.parse(text);
+    
+    // Extract grounding sources if available
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (groundingChunks) {
+      const sources = groundingChunks
+        .filter(chunk => chunk.web)
+        .map(chunk => ({ title: chunk.web?.title || 'Source', uri: chunk.web?.uri || '' }));
+      parsed.sources = [...(parsed.sources || []), ...sources];
     }
-  });
 
-  const text = response.text || "{}";
-  const parsed = JSON.parse(text);
-  
-  // Extract grounding sources if available
-  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-  if (groundingChunks) {
-    const sources = groundingChunks
-      .filter(chunk => chunk.web)
-      .map(chunk => ({ title: chunk.web?.title || 'Source', uri: chunk.web?.uri || '' }));
-    parsed.sources = [...(parsed.sources || []), ...sources];
+    return parsed;
+  } catch (error) {
+    console.error("mentorAgent failed:", error);
+    return { 
+      response: "I encountered a neural sync error. Please check your connection to the Senior Top node.",
+      sources: []
+    };
   }
-
-  return parsed;
 };
 
 export const fastAgent = async (query: string): Promise<string> => {

@@ -585,7 +585,14 @@ export default function App() {
                 {activeTab === 'habits' && "Habit Matrix"}
                 {activeTab === 'community' && "Regional Tech Hubs"}
               </h2>
-              <p className="text-slate-600 uppercase text-[10px] tracking-[0.2em] font-bold">Senior Top Protocol v1.0</p>
+              <div className="flex items-center gap-2">
+                <p className="text-slate-600 uppercase text-[10px] tracking-[0.2em] font-bold">Senior Top Protocol v1.0</p>
+                {!process.env.GEMINI_API_KEY && (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[8px] font-bold uppercase tracking-widest border border-amber-500/20">
+                    Neural Link Offline (Check API Key)
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center gap-4">
@@ -735,27 +742,55 @@ export default function App() {
           )}
 
           {activeTab === 'opportunities' && (
-            <motion.div 
-              key="opportunities"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-            >
-              {loading.opportunities ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-72 bg-[#111114] rounded-3xl border border-white/5 animate-pulse" />
-                ))
-              ) : (
-                opportunities.map((opp, i) => (
-                  <OpportunityCard 
-                    key={i} 
-                    opportunity={opp} 
-                    onClick={() => setSelectedOpportunity(opp)}
-                  />
-                ))
-              )}
-            </motion.div>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-slate-500">Real-time tracking of innovation nodes in Maharashtra.</p>
+                <button 
+                  onClick={handleFetchOpportunities}
+                  disabled={loading.opportunities}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/10 transition-all flex items-center gap-2"
+                >
+                  {loading.opportunities ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-cyan-400" />}
+                  Refresh Nodes
+                </button>
+              </div>
+              
+              <motion.div 
+                key="opportunities"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+              >
+                {loading.opportunities ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-72 bg-[#111114] rounded-3xl border border-white/5 animate-pulse" />
+                  ))
+                ) : opportunities.length > 0 ? (
+                  opportunities.map((opp, i) => (
+                    <OpportunityCard 
+                      key={i} 
+                      opportunity={opp} 
+                      onClick={() => setSelectedOpportunity(opp)}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-full py-20 flex flex-col items-center justify-center text-center glass-card glass-border rounded-[2.5rem]">
+                    <div className="w-20 h-20 rounded-3xl bg-slate-900 border border-white/5 flex items-center justify-center text-slate-700 mb-6">
+                      <Trophy size={40} />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-300 mb-2">No Active Nodes Found</h3>
+                    <p className="text-sm text-slate-500 max-w-xs">The neural network couldn't locate any active hackathons. Try refreshing the connection.</p>
+                    <button 
+                      onClick={handleFetchOpportunities}
+                      className="mt-8 px-8 py-4 rounded-2xl bg-cyan-600 text-white font-bold text-sm hover:bg-cyan-500 transition-all shadow-xl shadow-cyan-600/20"
+                    >
+                      Reconnect to Tracker
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
           )}
 
           {activeTab === 'habits' && (
