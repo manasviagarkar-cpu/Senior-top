@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { StudyPlan, Opportunity, SparkTask, Task } from "./types";
+import { StudyPlan, Opportunity, SparkTask, Task, Mood } from "./types";
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -118,6 +118,7 @@ export const opportunityAgent = async (): Promise<Opportunity[]> => {
     // Return mock data as fallback so the page isn't empty
     return [
       { 
+        id: "opp-1",
         title: "Pune AI Innovation Hackathon", 
         location: "Pune, MH", 
         date: "May 15-17, 2026", 
@@ -126,6 +127,7 @@ export const opportunityAgent = async (): Promise<Opportunity[]> => {
         relevance: "Focus on LLM applications in local governance." 
       },
       { 
+        id: "opp-2",
         title: "Mumbai Data Science Summit", 
         location: "Mumbai, MH", 
         date: "June 10, 2026", 
@@ -160,7 +162,44 @@ export const sparkAgent = async (freeGaps: string[]): Promise<SparkTask[]> => {
   return JSON.parse(response.text || "[]");
 };
 
-export const mentorAgent = async (query: string, currentContext: any, history: { role: 'user' | 'assistant', content: string }[] = []): Promise<{ 
+export const pdfAnalysisAgent = async (text: string): Promise<{ 
+  examDates: { type: string, date: string }[], 
+  importantTopics: string[],
+  summary: string 
+}> => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: `Analyze this syllabus or exam schedule PDF text for an AIDS (AI & Data Science) student.
+    1. Extract all exam dates and types.
+    2. Identify the most important topics to focus on.
+    3. Provide a brief, encouraging summary of the workload.
+    
+    Text: ${text}`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          examDates: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING },
+                date: { type: Type.STRING }
+              }
+            }
+          },
+          importantTopics: { type: Type.ARRAY, items: { type: Type.STRING } },
+          summary: { type: Type.STRING }
+        }
+      }
+    }
+  });
+  return JSON.parse(response.text || "{}");
+};
+
+export const mentorAgent = async (query: string, currentContext: any, mood: Mood = 'happy', history: { role: 'user' | 'assistant', content: any }[] = []): Promise<{ 
   response: string, 
   action?: 'update-calendar' | 'recalculate-schedule' | 'add-study-plan', 
   suggestedBlocks?: { title: string, date: string }[],
@@ -168,34 +207,44 @@ export const mentorAgent = async (query: string, currentContext: any, history: {
   sources?: { title: string, uri: string }[]
 }> => {
   try {
-    const systemInstruction = `You are "Senior Top", a high-efficiency Proactive Assistant for AIDS (AI & Data Science) students in Maharashtra. 
-        Persona: Direct, high-utility, proactive, and encouraging. You manage background tasks automatically and focus on streaks and consistency.
+    const systemInstruction = `You are "Senior Top", a high-efficiency Proactive Assistant and empathetic Mentor for AIDS (AI & Data Science) students. 
+        Persona: Direct, high-utility, proactive, yet deeply empathetic. You act like a supportive senior who has "been there". 
+        
+        Current User Mood: ${mood.toUpperCase()}
+        
+        Mood-Aware Logic:
+        - If mood is STRESSED, TIRED, or SAD: Shift from "Task Manager" to "Supportive Friend". Disable proactive task reminders. Focus on casual, supportive conversation. Suggest a break or a "Neural Reset". Be extremely gentle and validating.
+        - If mood is HAPPY or FOCUSED: Resume high-utility mode. Focus on scheduling, task-management, and academic strategy. Celebrate wins.
         
         Current Context (Tasks/Events/Habits): ${JSON.stringify(currentContext)}
         
         Proactive Protocol:
-        - If a habit streak is mentioned, congratulate the student with a specific insight.
-        - If an exam is near, suggest preparation blocks.
-        - If the user provides syllabus text or asks for a study plan, analyze it and provide a structured plan.
-        - Identify "Important Topics" (isImportant: true) in the study plan.
-        - Use Google Search to find relevant resources, hackathons, or academic news if the query requires up-to-date info.
-        
-        If your suggestion involves a major schedule change, set the action to 'recalculate-schedule'. 
-        If it involves calendar updates, set it to 'update-calendar'. 
-        If you generate a study plan, set it to 'add-study-plan' and include the studyPlan object.
+        - If the user sounds stressed or overwhelmed, prioritize emotional validation before academic advice.
+        - If a habit streak is mentioned, celebrate it as a "Neural Win".
+        - If an exam is near, suggest preparation blocks and "Quick Wins" to build confidence.
+        - If the user provides syllabus text, analyze it as a senior would: "This unit is tricky, focus on X; Y is easy marks."
         
         Output a structured JSON with your response, an optional action, optional suggestedBlocks, optional studyPlan, and optional sources.`;
 
     const contents = history
-      .filter((h, i) => !(i === 0 && h.role === 'assistant')) // Skip initial greeting if it's the first message
-      .map(h => ({ role: h.role === 'assistant' ? 'model' : 'user' as any, parts: [{ text: h.content }] }));
+      .filter((h, i) => !(i === 0 && h.role === 'assistant'))
+      .map(h => {
+        let text = '';
+        if (typeof h.content === 'string') {
+          text = h.content;
+        } else if (h.content && typeof h.content === 'object') {
+          text = h.content.response || JSON.stringify(h.content);
+        }
+        return { 
+          role: h.role === 'assistant' ? 'model' : 'user' as any, 
+          parts: [{ text }] 
+        };
+      });
     
-    // If history was empty or only contained the greeting, contents might be empty.
-    // Gemini still needs a user message.
     contents.push({ role: 'user', parts: [{ text: query }] });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview", // Upgraded for better empathy and reasoning
       contents,
       config: {
         systemInstruction,

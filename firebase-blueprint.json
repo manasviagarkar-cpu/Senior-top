@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "User task information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "title": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "type": { "type": "string", "enum": ["class", "study", "break", "event", "task"] },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "completed": { "type": "boolean" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "uid", "title", "startTime", "endTime", "type", "priority", "completed"]
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "User calendar event information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["exam", "hackathon", "study-block", "holiday"] },
+        "registered": { "type": "boolean" },
+        "registrationDate": { "type": "string", "format": "date-time" },
+        "daysUnregistered": { "type": "number" }
+      },
+      "required": ["id", "uid", "title", "date", "type"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "User habit information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "title": { "type": "string" },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "streak": { "type": "number" },
+        "lastCompleted": { "type": "string", "format": "date-time" },
+        "history": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "uid", "title", "icon", "color", "streak", "history"]
+    },
+    "CommunityPost": {
+      "title": "Community Post",
+      "description": "Community post information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorPhoto": { "type": "string" },
+        "content": { "type": "string" },
+        "hubId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "likes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "uid", "authorName", "content", "hubId", "createdAt", "likes"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User task documents"
+    },
+    "/calendarEvents/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "User calendar event documents"
+    },
+    "/habits/{habitId}": {
+      "schema": "Habit",
+      "description": "User habit documents"
+    },
+    "/communityPosts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Community post documents"
+    }
+  }
+}

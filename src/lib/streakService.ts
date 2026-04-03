@@ -1,16 +1,16 @@
-import { Habit, HabitLog } from '../types';
+import { Habit } from '../types';
 import { format, subDays, isSameDay, parseISO } from 'date-fns';
 
 const HABITS_KEY = 'senior_top_habits';
 const LOG_KEY = 'senior_top_habit_log';
 
 export const StreakService = {
-  getHabits: (): Habit[] => {
+  getHabits: (uid: string): Habit[] => {
     const stored = localStorage.getItem(HABITS_KEY);
     if (!stored) return [
-      { id: 'coding', title: 'Coding', icon: 'Terminal', color: 'cyan', streak: 0, history: [] },
-      { id: 'study', title: 'OS Study', icon: 'BookOpen', color: 'blue', streak: 0, history: [] },
-      { id: 'exercise', title: 'Exercise', icon: 'Activity', color: 'emerald', streak: 0, history: [] },
+      { id: 'coding', uid, title: 'Coding', icon: 'Terminal', color: 'cyan', streak: 0, history: [] },
+      { id: 'study', uid, title: 'OS Study', icon: 'BookOpen', color: 'blue', streak: 0, history: [] },
+      { id: 'exercise', uid, title: 'Exercise', icon: 'Activity', color: 'emerald', streak: 0, history: [] },
     ];
     return JSON.parse(stored);
   },
